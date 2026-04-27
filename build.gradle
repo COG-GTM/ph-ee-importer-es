@@ -164,7 +164,8 @@ configure(this) {
 
 group = 'org.mifos'
 version = '1.0.0-SNAPSHOT'
-sourceCompatibility = '17'
+sourceCompatibility = '21'
+targetCompatibility = '21'
 
 publishing {
     publications {
