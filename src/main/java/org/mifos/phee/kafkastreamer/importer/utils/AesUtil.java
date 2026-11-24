@@ -5,6 +5,8 @@ import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -15,6 +17,8 @@ import org.apache.commons.codec.binary.Base64;
 import org.json.JSONObject;
 
 public class AesUtil {
+
+    private static final Map<String, SecretKey> DERIVED_KEYS = new ConcurrentHashMap<>();
 
     /**
      * Encrypts the string data using AES algorithm
@@ -27,7 +31,7 @@ public class AesUtil {
      * @throws Exception
      */
     public static String encrypt(String plaintext, String stringKey) throws Exception {
-        SecretKey key = getSecretKey(stringKey);
+        SecretKey key = getCachedSecretKey(stringKey);
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.ENCRYPT_MODE, key);
         return base64Encode(cipher.doFinal(plaintext.getBytes()));
@@ -44,7 +48,7 @@ public class AesUtil {
      * @throws Exception
      */
     public static String decrypt(String encryptedString, String stringKey) throws Exception {
-        SecretKey key = getSecretKey(stringKey);
+        SecretKey key = getCachedSecretKey(stringKey);
         byte[] cipherText = base64Decode(encryptedString);
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.DECRYPT_MODE, key);
@@ -76,6 +80,16 @@ public class AesUtil {
 
         SecretKey newKey = deriveKey(key, aesByte, iterationCount, keyLength);
         return newKey;
+    }
+
+    // PBKDF2 derivation is deterministic per key and costs 10000 HMAC rounds, so derive each key once
+    static SecretKey getCachedSecretKey(String key) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        SecretKey cached = DERIVED_KEYS.get(key);
+        if (cached == null) {
+            cached = getSecretKey(key);
+            DERIVED_KEYS.putIfAbsent(key, cached);
+        }
+        return cached;
     }
 
     // generates and returns the string encoded AES key
